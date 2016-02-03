@@ -80,10 +80,12 @@ class WeatherAPI
         return_val[0] = @@coord_cache[key]["city"]
         return_val[1] = @@coord_cache[key]["state"]
         return_val[2] = @@coord_cache[key]["zipcode"]
-        return return_val
       else
-        raise "Premature Call to Google API - #{lat},#{lon}" if (@@google_last_call + (60/@@google_calls_per_minute)) > Time.now.to_i
         raise "Daily Call Limit Reached for Google API - #{lat},#{lon}" if @@google_total_calls > @@google_call_limit
+        time_allowed = @@google_last_call + (60/@@google_calls_per_minute)
+        time_now = Time.now.to_i
+        sleep(time_allowed - time_now) if time_allowed > time_now
+        
         uri = URI(@@google_root)
         params = { :latlng => "#{lat},#{lon}",
                    :key => @@google_key
@@ -135,8 +137,7 @@ class WeatherAPI
       puts err
     end
     
-    sleep(60/@@google_calls_per_minute)
-    return_val
+    return return_val
   end
   
   def setup_coord_cache
@@ -233,7 +234,7 @@ def main
     return if !coords
     puts 'Success!'
     
-    number_to_run = 5
+    number_to_run = 15
     
     print 'Translating lat/lon data to city, state, and zipcode... 0%'
     data = [['city', 'state', 'zip', 'lat', 'lon', 'day', 'date']]
