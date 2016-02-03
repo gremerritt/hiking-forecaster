@@ -45,8 +45,10 @@ class WeatherAPI
   
   def weather_call(postal_code_eq, timestamp_eq)
     begin
-      raise "Premature Call to Weather API - #{postal_code_eq},#{timestamp_eq}" if (@@weather_last_call + (60/@@weather_calls_per_minute)) > Time.now.to_i
       raise "Daily Call Limit Reached to Weather API - #{postal_code_eq},#{timestamp_eq}" if @@weather_total_calls > @@weather_call_limit
+      time_allowed = @@weather_last_call + (60/@@weather_calls_per_minute)
+      time_now = Time.now.to_i
+      sleep(time_allowed - time_now) if time_allowed > time_now
       
       uri = URI(@@weather_uri)
       params = { :postal_code_eq => postal_code_eq,
