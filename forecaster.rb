@@ -39,6 +39,7 @@ class WeatherAPI
     t = Time.new
     @@today = "#{t.year}-#{t.month}-#{t.day}"
     read_call_counts
+    setup_coord_cache
     #puts "weather_total_calls: #{@@weather_total_calls}\nweather_last_call: #{@@weather_last_call}\ngoogle_total_calls: #{@@google_total_calls}\ngoogle_last_call: #{@@google_last_call}"
   end
   
@@ -73,52 +74,62 @@ class WeatherAPI
   
   def google_call(lat, lon, debug = false)	
     begin
-      raise "Premature Call to Google API - #{lat},#{lon}" if (@@google_last_call + (60/@@google_calls_per_minute)) > Time.now.to_i
-      raise "Daily Call Limit Reached for Google API - #{lat},#{lon}" if @@google_total_calls > @@google_call_limit
-      
       return_val = ['', '', '', lat, lon]
-      
-      uri = URI(@@google_root)
-      params = { :latlng => "#{lat},#{lon}",
-                 :key => @@google_key
-               }
-      uri.query = URI.encode_www_form(params)
-      res = Net::HTTP.get_response(uri)
-      json_response = JSON.parse(res.body)
-      @@google_last_call = Time.now.to_i
-      @@google_total_calls += 1
-      if res.is_a?(Net::HTTPSuccess)
-        puts "#{JSON.pretty_generate(json_response)}\n\n" if debug
-        if json_response['status'] == 'OK'
-          puts "OK\n\n" if debug
-          address = json_response['results'][0]
-          puts "#{JSON.pretty_generate(address)}\n\n" if debug
-          address['address_components'].each do |address_component|
-            puts "#{address_component}\n\n" if debug
-            
-            # city
-            if address_component['types'][0] == 'locality'
-              puts "#{address_component['long_name']}\n\n" if debug
-              return_val[0] = address_component['long_name']
+      key = "#{'%.3f' % lat.to_f},#{'%.3f' % lon.to_f}"
+      if !@@coord_cache[key].nil?
+        return_val[0] = @@coord_cache[key]["city"]
+        return_val[1] = @@coord_cache[key]["state"]
+        return_val[2] = @@coord_cache[key]["zipcode"]
+        return return_val
+      else
+        raise "Premature Call to Google API - #{lat},#{lon}" if (@@google_last_call + (60/@@google_calls_per_minute)) > Time.now.to_i
+        raise "Daily Call Limit Reached for Google API - #{lat},#{lon}" if @@google_total_calls > @@google_call_limit
+        uri = URI(@@google_root)
+        params = { :latlng => "#{lat},#{lon}",
+                   :key => @@google_key
+                 }
+        uri.query = URI.encode_www_form(params)
+        res = Net::HTTP.get_response(uri)
+        json_response = JSON.parse(res.body)
+        @@google_last_call = Time.now.to_i
+        @@google_total_calls += 1
+        if res.is_a?(Net::HTTPSuccess)
+          puts "#{JSON.pretty_generate(json_response)}\n\n" if debug
+          if json_response['status'] == 'OK'
+            puts "OK\n\n" if debug
+            address = json_response['results'][0]
+            puts "#{JSON.pretty_generate(address)}\n\n" if debug
+            address['address_components'].each do |address_component|
+              puts "#{address_component}\n\n" if debug
+              
+              # city
+              if address_component['types'][0] == 'locality'
+                puts "#{address_component['long_name']}\n\n" if debug
+                return_val[0] = address_component['long_name']
+              end
+              
+              #state
+              if address_component['types'][0] == 'administrative_area_level_1'
+                puts "#{address_component['short_name']}\n\n" if debug
+                return_val[1] = address_component['short_name']
+              end
+              
+              #zip
+              if address_component['types'][0] == 'postal_code'
+                puts "#{address_component['long_name'].to_s}\n\n" if debug
+                return_val[2] = address_component['long_name'].to_s
+              end
+              
+              @@coord_cache[key] = {"city" => return_val[0],
+                                    "state" => return_val[1],
+                                    "zipcode" => return_val[2]}
             end
-            
-            #state
-            if address_component['types'][0] == 'administrative_area_level_1'
-              puts "#{address_component['short_name']}\n\n" if debug
-              return_val[1] = address_component['short_name']
-            end
-            
-            #zip
-            if address_component['types'][0] == 'postal_code'
-              puts "#{address_component['long_name'].to_s}\n\n" if debug
-              return_val[2] = address_component['long_name'].to_s
-            end
+          else
+            puts "No address info found for #{lat},#{lon}"
           end
         else
-          puts "No address info found for #{lat},#{lon}"
+          puts json_response['message']
         end
-      else
-        puts json_response['message']
       end
     rescue StandardError => err
       puts err
@@ -126,6 +137,17 @@ class WeatherAPI
     
     sleep(60/@@google_calls_per_minute)
     return_val
+  end
+  
+  def setup_coord_cache
+    File.open(".coordinate_cache.json", "a+") do |f|
+      contents = f.read
+      if contents != ""
+        @@coord_cache = JSON.parse(contents)
+      else
+        @@coord_cache = {}
+      end
+    end
   end
   
   def read_call_counts
@@ -169,11 +191,14 @@ class WeatherAPI
     end
   end
   
-  def flush_file
-    fname = '.forecaster_calls.json'
-    File.open(fname, "w") do |f|
+  def flush
+    File.open(".forecaster_calls.json", "w") do |f|
       f.write({"weather" => {'last_call' => @@weather_last_call, @@today => @@weather_total_calls},
                "google" => {'last_call' => @@google_last_call, @@today => @@google_total_calls}}.to_json)
+    end
+    
+    File.open(".coordinate_cache.json", "w") do |f|
+      f.write(@@coord_cache.to_json)
     end
   end
 end
@@ -271,7 +296,7 @@ def main
     end
     
   ensure
-    api.flush_file
+    api.flush
   end
 end
 
