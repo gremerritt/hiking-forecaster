@@ -228,8 +228,26 @@ def parseKML(filepath)
   return result
 end
 
+def getDate(prompt)
+  valid_date = false
+  while !valid_date
+    begin
+      print prompt
+      date = Date.parse(STDIN.gets.chomp)
+      return date
+    rescue StandardError => msg
+      puts " => Invalid Date Format"
+    end
+  end
+end
+
 def main
   api = WeatherAPI.new
+  start_date = getDate("Enter a start date (YYYY-MM-DD): ")
+  end_date = getDate("Enter an end date (YYYY-MM-DD): ")
+  num_days = (end_date - start_date).to_i
+  puts "Total number of days: #{num_days}"
+  
   begin
     print 'Parsing KML file... '
     coords = parseKML('pct.kml')
@@ -253,20 +271,6 @@ def main
       end
     end
     puts "\rTranslating lat/lon data to city, state, and zipcode... Success!"
-    
-    begin
-      print "\nEnter a start date (YYYY-MM-DD): "
-      start_date = Date.parse(STDIN.gets.chomp)
-      print "Enter an end date (YYYY-MM-DD): "
-      end_date = Date.parse(STDIN.gets.chomp)
-    rescue Exception => msg
-      puts msg
-      puts "Invalid Date Format"
-      return
-    end
-    
-    num_days = (end_date - start_date).to_i
-    puts "Total number of days: #{num_days}"
 	
     counts = Array.new
     if coords.length > num_days
