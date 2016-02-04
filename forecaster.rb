@@ -109,16 +109,16 @@ class WeatherAPI
           end
           
           @@weather_cache[key] = {"feelsLikeMin" => return_val[0],
-                                "feelsLikeAvg" => return_val[1],
-                                "feelsLikeMax" => return_val[2],
-                                "precip" => return_val[3],
-                                "snowfall" => return_val[4],
-                                "tempMin" => return_val[5],
-                                "tempAvg" => return_val[6],
-                                "tempMax" => return_val[7],
-                                "windSpdMin" => return_val[8],
-                                "windSpdAvg" => return_val[9],
-                                "windSpdMax" => return_val[10]}
+                                  "feelsLikeAvg" => return_val[1],
+                                  "feelsLikeMax" => return_val[2],
+                                  "precip" => return_val[3],
+                                  "snowfall" => return_val[4],
+                                  "tempMin" => return_val[5],
+                                  "tempAvg" => return_val[6],
+                                  "tempMax" => return_val[7],
+                                  "windSpdMin" => return_val[8],
+                                  "windSpdAvg" => return_val[9],
+                                  "windSpdMax" => return_val[10]}
         else
           puts json_response['message']
         end
@@ -320,10 +320,8 @@ end
 
 def main
   api = WeatherAPI.new
-#   start_date = getDate("Enter a start date (YYYY-MM-DD): ")
-#   end_date = getDate("Enter an end date (YYYY-MM-DD): ")
-  start_date = Date.parse("2017-04-01")
-  end_date = Date.parse("2017-07-07")
+  start_date = getDate("Enter a start date (YYYY-MM-DD): ")
+  end_date = getDate("Enter an end date (YYYY-MM-DD): ")
   num_days = (end_date - start_date).to_i + 1
   puts "Total number of days:   #{num_days}"
   
