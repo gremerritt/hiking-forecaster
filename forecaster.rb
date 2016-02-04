@@ -51,7 +51,7 @@ class WeatherAPI
       timestamp = getRelativeDate(timestamp_eq, 2)
       key = "#{postal_code_eq}|#{timestamp}"
       
-      if !@@coord_cache[key].nil?
+      if !@@weather_cache[key].nil?
         return_val[0] = @@weather_cache[key]["feelsLikeMin"]
         return_val[1] = @@weather_cache[key]["feelsLikeAvg"]
         return_val[2] = @@weather_cache[key]["feelsLikeMax"]
