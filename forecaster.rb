@@ -320,18 +320,22 @@ end
 
 def main
   api = WeatherAPI.new
+  print "What trail is this for? "
+  trail = STDIN.gets.chomp
+  print "Enter the path to your KML file: "
+  kml_file = STDIN.gets.chomp
+  print 'Parsing KML file... '
+  data = parseKML(File.expand_path(kml_file))
+  return if !data
+  puts 'Success!'
+  puts "Total number of points: #{data.length}"
+  
   start_date = getDate("Enter a start date (YYYY-MM-DD): ")
   end_date = getDate("Enter an end date (YYYY-MM-DD): ")
   num_days = (end_date - start_date).to_i + 1
   puts "Total number of days:   #{num_days}"
   
   begin
-    print 'Parsing KML file... '
-    data = parseKML('pct.kml')
-    return if !data
-    puts 'Success!'
-    puts "Total number of points: #{data.length}"
-    
     if data.length > num_days
       div = (data.length / num_days).to_i
       mod = data.length % num_days
@@ -358,24 +362,25 @@ def main
         end
         tmp_date += 1
       end
+    else
+      "Having the number of hiking days be less than the number of coordinates from your KML file is not yet supported."
+      return
     end
     
     print 'Translating lat/lon data to city/state/zipcode and getting weather data... 0%'
     percent_done = 0
-    File.open('pct_zipcodes.csv', 'w') do |f|
-      data.each_with_index do |d, index|
-        # get city/state/zip info
-        rslt = api.google_call(d[1], d[0])
-        d.push(*rslt)
-        
-        # get weather data
-        rslt = api.weather_call(d[6], d[3])
-        d.push(*rslt)
-        
-        if ((index.to_f / data.length)*100).to_i > percent_done
-          percent_done = ((index.to_f / data.length)*100).to_i
-          print "\rTranslating lat/lon data to city/state/zipcode and getting weather data... #{percent_done}%"
-        end
+    data.each_with_index do |d, index|
+      # get city/state/zip info
+      rslt = api.google_call(d[1], d[0])
+      d.push(*rslt)
+      
+      # get weather data
+      rslt = api.weather_call(d[6], d[3])
+      d.push(*rslt)
+      
+      if ((index.to_f / data.length)*100).to_i > percent_done
+        percent_done = ((index.to_f / data.length)*100).to_i
+        print "\rTranslating lat/lon data to city/state/zipcode and getting weather data... #{percent_done}%"
       end
     end
     puts "\rTranslating lat/lon data to city/state/zipcode and getting weather data... Success!"
@@ -399,7 +404,7 @@ def main
               "windSpdAvg",
               "windSpdMax"]
     data.insert(0, header)
-    File.open("pct_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
+    File.open("#{trail}_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
   ensure
     api.flush
   end
