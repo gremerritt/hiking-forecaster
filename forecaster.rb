@@ -76,7 +76,7 @@ class WeatherAPI
   
   def google_call(lat, lon, debug = false)	
     begin
-      return_val = ['', '', '', lat, lon]
+      return_val = ['', '', '']
       key = "#{'%.3f' % lat.to_f},#{'%.3f' % lon.to_f}"
       if !@@coord_cache[key].nil?
         return_val[0] = @@coord_cache[key]["city"]
@@ -243,64 +243,72 @@ end
 
 def main
   api = WeatherAPI.new
-  start_date = getDate("Enter a start date (YYYY-MM-DD): ")
-  end_date = getDate("Enter an end date (YYYY-MM-DD): ")
-  num_days = (end_date - start_date).to_i
-  puts "Total number of days: #{num_days}"
+#   start_date = getDate("Enter a start date (YYYY-MM-DD): ")
+#   end_date = getDate("Enter an end date (YYYY-MM-DD): ")
+  start_date = Date.parse("2017-04-01")
+  end_date = Date.parse("2017-07-07")
+  num_days = (end_date - start_date).to_i + 1
+  puts "Total number of days:   #{num_days}"
   
   begin
     print 'Parsing KML file... '
-    coords = parseKML('pct.kml')
-    return if !coords
+    data = parseKML('pct.kml')
+    return if !data
     puts 'Success!'
+    puts "Total number of points: #{data.length}"
     
-    number_to_run = 15
-    
-    print 'Translating lat/lon data to city, state, and zipcode... 0%'
-    data = [['city', 'state', 'zip', 'lat', 'lon', 'day', 'date']]
-    percent_done = 0
-    File.open('pct_zipcodes.csv', 'w') do |f|
-      coords.each_with_index do |coord, index|
-        rslt = api.google_call(coord[1], coord[0])
-        data.push(rslt)
-        if ((index.to_f / coords.length)*100).to_i > percent_done
-          percent_done = ((index.to_f / coords.length)*100).to_i
-          print "\rTranslating lat/lon data to city, state, and zipcode... #{percent_done}%"
-        end
-        break if index == number_to_run - 1
-      end
-    end
-    puts "\rTranslating lat/lon data to city, state, and zipcode... Success!"
-	
-    counts = Array.new
-    if coords.length > num_days
-      div = (coords.length / num_days).to_i
-      mod = coords.length % num_days
+    if data.length > num_days
+      div = (data.length / num_days).to_i
+      mod = data.length % num_days
       add = (num_days.to_f / mod).ceil
+      puts "div: #{div}"
+      puts "mod: #{mod}"
+      puts "add: #{add}"
+      counts = Array.new(num_days, div)
       
-      num_days.times do |i|
-        if i%add == 0
-          counts.push(div+1)
-        else
-          counts.push(div)
+      rand = Random.new
+      mod.times do
+        while true
+          index = rand.rand(num_days)
+          if counts[index] != div + 1
+            counts[index] += 1
+            break
+          end
         end
       end
       
-      loc_index = 1
+      loc_index = 0
       tmp_date = start_date
       counts.each_with_index do |count, day|
         count.times do
           data[loc_index].push(day+1)
           data[loc_index].push(tmp_date.strftime())
           loc_index += 1
-          break if loc_index == number_to_run + 1
         end
-        break if loc_index == number_to_run + 1
         tmp_date += 1
       end
-      
-      File.open("pct_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
     end
+
+    number_to_run = 15
+    
+    print 'Translating lat/lon data to city/state/zipcode and getting weather data... 0%'
+    #data = [['city', 'state', 'zip', 'lat', 'lon', 'day', 'date']]
+    percent_done = 0
+    File.open('pct_zipcodes.csv', 'w') do |f|
+      data.each_with_index do |d, index|
+        rslt = api.google_call(d[1], d[0])
+        d.push(*rslt)
+        if ((index.to_f / data.length)*100).to_i > percent_done
+          percent_done = ((index.to_f / data.length)*100).to_i
+          print "\rTranslating lat/lon data to city, state, and zipcode... #{percent_done}%"
+        end
+        break if index == number_to_run - 1
+      end
+    end
+    puts "\rTranslating lat/lon data to city, state, and zipcode... Success!"
+    
+    data.each { |d| puts d.to_s }
+    File.open("pct_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
     
   ensure
     api.flush
