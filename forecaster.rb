@@ -9,19 +9,17 @@ class WeatherAPI
   @@weather_key = 'b2f3ea7109d2f376bd0a'
   @@weather_resource = 'history_by_postal_code'
   @@weather_format = 'json'
-  @@weather_fields = ['postal_code',
-              'timestamp',
-              'tempMax',
-              'tempAvg',
-              'tempMin',
-              'precip',
-              'snowfall',
-              'windSpdMax',
-              'windSpdAvg',
-              'windSpdMin',
-              'feelsLikeMax',
-              'feelsLikeAvg',
-              'feelsLikeMin']
+  @@weather_fields = ['tempMax',
+                      'tempAvg',
+                      'tempMin',
+                      'precip',
+                      'snowfall',
+                      'windSpdMax',
+                      'windSpdAvg',
+                      'windSpdMin',
+                      'feelsLikeMax',
+                      'feelsLikeAvg',
+                      'feelsLikeMin']
   @@weather_total_calls
   @@weather_last_call
   @@weather_calls_per_minute = 10
@@ -40,38 +38,103 @@ class WeatherAPI
     @@today = "#{t.year}-#{t.month}-#{t.day}"
     read_call_counts
     setup_coord_cache
+    setup_weather_cache
     #puts "weather_total_calls: #{@@weather_total_calls}\nweather_last_call: #{@@weather_last_call}\ngoogle_total_calls: #{@@google_total_calls}\ngoogle_last_call: #{@@google_last_call}"
   end
   
   def weather_call(postal_code_eq, timestamp_eq)
     begin
-      raise "Daily Call Limit Reached to Weather API - #{postal_code_eq},#{timestamp_eq}" if @@weather_total_calls > @@weather_call_limit
-      time_allowed = @@weather_last_call + (60/@@weather_calls_per_minute)
-      time_now = Time.now.to_i
-      sleep(time_allowed - time_now) if time_allowed > time_now
+      return_val = Array.new
+      @@weather_fields.length.times { return_val.push("") }
+      return return_val if postal_code_eq == ""
       
-      uri = URI(@@weather_uri)
-      params = { :postal_code_eq => postal_code_eq,
-                 :timestamp_eq => timestamp_eq,
-                 :country_eq => 'US',
-                 :fields => @@weather_fields.join(',')
-               }
-      uri.query = URI.encode_www_form(params)
-      res = Net::HTTP.get_response(uri)
-      json_response = JSON.parse(res.body)
-      if res.is_a?(Net::HTTPSuccess)
-        pprint = JSON.pretty_generate(json_response)
-        puts pprint
+      timestamp = getRelativeDate(timestamp_eq, 2)
+      key = "#{postal_code_eq}|#{timestamp}"
+      
+      if !@@coord_cache[key].nil?
+        return_val[0] = @@weather_cache[key]["feelsLikeMin"]
+        return_val[1] = @@weather_cache[key]["feelsLikeAvg"]
+        return_val[2] = @@weather_cache[key]["feelsLikeMax"]
+        return_val[3] = @@weather_cache[key]["precip"]
+        return_val[4] = @@weather_cache[key]["snowfall"]
+        return_val[5] = @@weather_cache[key]["tempMin"]
+        return_val[6] = @@weather_cache[key]["tempAvg"]
+        return_val[7] = @@weather_cache[key]["tempMax"]
+        return_val[8] = @@weather_cache[key]["windSpdMin"]
+        return_val[9] = @@weather_cache[key]["windSpdAvg"]
+        return_val[10] = @@weather_cache[key]["windSpdMax"]
       else
-        puts json_response['message']
+        raise "Daily Call Limit Reached to Weather API - #{postal_code_eq},#{timestamp_eq}" if @@weather_total_calls > @@weather_call_limit
+        time_allowed = @@weather_last_call + (60/@@weather_calls_per_minute)
+        time_now = Time.now.to_i
+        sleep(time_allowed - time_now) if time_allowed > time_now
+        
+        uri = URI(@@weather_uri)
+        params = {:period => 'day',
+                  :postal_code_eq => postal_code_eq,
+                  :country_eq => 'US',
+                  :timestamp_eq => timestamp,
+                  :fields => @@weather_fields.join(',')}
+        uri.query = URI.encode_www_form(params)
+        res = Net::HTTP.get_response(uri)
+        json_response = JSON.parse(res.body)
+        @@weather_last_call = Time.now.to_i
+        @@weather_total_calls += 1
+        if res.is_a?(Net::HTTPSuccess)
+          json_response[0].each do |key, val|
+            case key
+            when "feelsLikeMin"
+              return_val[0] = val
+            when "feelsLikeAvg"
+              return_val[1] = val
+            when "feelsLikeMax"
+              return_val[2] = val
+            when "precip"
+              return_val[3] = val
+            when "snowfall"
+              return_val[4] = val
+            when "tempMin"
+              return_val[5] = val
+            when "tempAvg"
+              return_val[6] = val
+            when "tempMax"
+              return_val[7] = val
+            when "windSpdMin"
+              return_val[8] = val
+            when "windSpdAvg"
+              return_val[9] = val
+            when "windSpdMax"
+              return_val[10] = val
+            end
+          end
+          
+          @@weather_cache[key] = {"feelsLikeMin" => return_val[0],
+                                "feelsLikeAvg" => return_val[1],
+                                "feelsLikeMax" => return_val[2],
+                                "precip" => return_val[3],
+                                "snowfall" => return_val[4],
+                                "tempMin" => return_val[5],
+                                "tempAvg" => return_val[6],
+                                "tempMax" => return_val[7],
+                                "windSpdMin" => return_val[8],
+                                "windSpdAvg" => return_val[9],
+                                "windSpdMax" => return_val[10]}
+        else
+          puts json_response['message']
+        end
       end
-      @@weather_last_call = Time.now.to_i
-      @@weather_total_calls += 1
-      return true
     rescue StandardError => err
       puts err
-      return false
     end
+    return return_val
+  end
+  
+  def getRelativeDate(timestamp_eq, difference)
+    date = timestamp_eq.split("-")
+    year = date[0].to_i
+    year -= difference
+    date[0] = year.to_s
+    return date.join("-")
   end
   
   def google_call(lat, lon, debug = false)	
@@ -138,7 +201,6 @@ class WeatherAPI
     rescue StandardError => err
       puts err
     end
-    
     return return_val
   end
   
@@ -149,6 +211,17 @@ class WeatherAPI
         @@coord_cache = JSON.parse(contents)
       else
         @@coord_cache = {}
+      end
+    end
+  end
+  
+  def setup_weather_cache
+    File.open(".weather_cache.json", "a+") do |f|
+      contents = f.read
+      if contents != ""
+        @@weather_cache = JSON.parse(contents)
+      else
+        @@weather_cache = {}
       end
     end
   end
@@ -202,6 +275,10 @@ class WeatherAPI
     
     File.open(".coordinate_cache.json", "w") do |f|
       f.write(@@coord_cache.to_json)
+    end
+    
+    File.open(".weather_cache.json", "w") do |f|
+      f.write(@@weather_cache.to_json)
     end
   end
 end
@@ -288,28 +365,28 @@ def main
         tmp_date += 1
       end
     end
-
-    number_to_run = 15
     
     print 'Translating lat/lon data to city/state/zipcode and getting weather data... 0%'
-    #data = [['city', 'state', 'zip', 'lat', 'lon', 'day', 'date']]
     percent_done = 0
     File.open('pct_zipcodes.csv', 'w') do |f|
       data.each_with_index do |d, index|
+        # get city/state/zip info
         rslt = api.google_call(d[1], d[0])
         d.push(*rslt)
+        
+        # get weather data
+        rslt = api.weather_call(d[6], d[3])
+        d.push(*rslt)
+        
         if ((index.to_f / data.length)*100).to_i > percent_done
           percent_done = ((index.to_f / data.length)*100).to_i
-          print "\rTranslating lat/lon data to city, state, and zipcode... #{percent_done}%"
+          print "\rTranslating lat/lon data to city/state/zipcode and getting weather data... #{percent_done}%"
         end
-        break if index == number_to_run - 1
       end
     end
-    puts "\rTranslating lat/lon data to city, state, and zipcode... Success!"
+    puts "\rTranslating lat/lon data to city/state/zipcode and getting weather data... Success!"
     
-    data.each { |d| puts d.to_s }
     File.open("pct_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
-    
   ensure
     api.flush
   end
