@@ -120,11 +120,11 @@ class WeatherAPI
                                   "windSpdAvg" => return_val[9],
                                   "windSpdMax" => return_val[10]}
         else
-          puts json_response['message']
+          #puts json_response['message']
         end
       end
     rescue StandardError => err
-      puts err
+      #puts err
     end
     return return_val
   end
@@ -195,11 +195,11 @@ class WeatherAPI
             puts "No address info found for #{lat},#{lon}"
           end
         else
-          puts json_response['message']
+          #puts json_response['message']
         end
       end
     rescue StandardError => err
-      puts err
+      #puts err
     end
     return return_val
   end
@@ -380,6 +380,25 @@ def main
     end
     puts "\rTranslating lat/lon data to city/state/zipcode and getting weather data... Success!"
     
+    header = ["lat",
+              "lon",
+              "day",
+              "date",
+              "city",
+              "state",
+              "zipcode",
+              "feelsLikeMin",
+              "feelsLikeAvg",
+              "feelsLikeMax",
+              "precip",
+              "snowfall",
+              "tempMin",
+              "tempAvg",
+              "tempMax",
+              "windSpdMin",
+              "windSpdAvg",
+              "windSpdMax"]
+    data.insert(0, header)
     File.open("pct_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
   ensure
     api.flush
