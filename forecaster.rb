@@ -336,11 +336,7 @@ def main
       div = (data.length / num_days).to_i
       mod = data.length % num_days
       add = (num_days.to_f / mod).ceil
-      puts "div: #{div}"
-      puts "mod: #{mod}"
-      puts "add: #{add}"
       counts = Array.new(num_days, div)
-      
       rand = Random.new
       mod.times do
         while true
