@@ -309,14 +309,25 @@ def parseKML(filepath)
 end
 
 def getDate(prompt)
-  valid_date = false
-  while !valid_date
+  while true
     begin
       print prompt
       date = Date.parse(STDIN.gets.chomp)
       return date
     rescue StandardError => msg
       puts " => Invalid Date Format"
+    end
+  end
+end
+
+def getDirection
+  while true
+    print "Enter a hiking direction (NS or SN): "
+    direction = STDIN.gets.chomp
+    if direction == "NS" or direction == "SN"
+      return direction
+    else
+      puts " => Invalid Selection"
     end
   end
 end
@@ -333,6 +344,8 @@ def main
   puts 'Success!'
   puts "Total number of points: #{data.length}"
   
+  direction = getDirection
+  data.reverse! if (direction == "NS" and data[0][1] < data[-1][1]) or (direction == "SN" and data[0][1] > data[-1][1])
   start_date = getDate("Enter a start date (YYYY-MM-DD): ")
   end_date = getDate("Enter an end date (YYYY-MM-DD): ")
   num_days = (end_date - start_date).to_i + 1
