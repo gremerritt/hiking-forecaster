@@ -49,20 +49,21 @@ class WeatherAPI
       return return_val if postal_code_eq == ""
       
       timestamp = getRelativeDate(timestamp_eq, 2)
-      key = "#{postal_code_eq}|#{timestamp}"
+      #key = "#{postal_code_eq}|#{timestamp}"
       
-      if !@@weather_cache[key].nil?
-        return_val[0] = @@weather_cache[key]["feelsLikeMin"]
-        return_val[1] = @@weather_cache[key]["feelsLikeAvg"]
-        return_val[2] = @@weather_cache[key]["feelsLikeMax"]
-        return_val[3] = @@weather_cache[key]["precip"]
-        return_val[4] = @@weather_cache[key]["snowfall"]
-        return_val[5] = @@weather_cache[key]["tempMin"]
-        return_val[6] = @@weather_cache[key]["tempAvg"]
-        return_val[7] = @@weather_cache[key]["tempMax"]
-        return_val[8] = @@weather_cache[key]["windSpdMin"]
-        return_val[9] = @@weather_cache[key]["windSpdAvg"]
-        return_val[10] = @@weather_cache[key]["windSpdMax"]
+      if !@@weather_cache[postal_code_eq][timestamp].nil?
+        cache = @@weather_cache[postal_code_eq][timestamp]
+        return_val[0] = cache["feelsLikeMin"]
+        return_val[1] = cache["feelsLikeAvg"]
+        return_val[2] = cache["feelsLikeMax"]
+        return_val[3] = cache["precip"]
+        return_val[4] = cache["snowfall"]
+        return_val[5] = cache["tempMin"]
+        return_val[6] = cache["tempAvg"]
+        return_val[7] = cache["tempMax"]
+        return_val[8] = cache["windSpdMin"]
+        return_val[9] = cache["windSpdAvg"]
+        return_val[10] = cache["windSpdMax"]
       else
         raise "Daily Call Limit Reached to Weather API - #{postal_code_eq},#{timestamp_eq}" if @@weather_total_calls > @@weather_call_limit
         time_allowed = @@weather_last_call + (60/@@weather_calls_per_minute)
@@ -108,7 +109,7 @@ class WeatherAPI
             end
           end
           
-          @@weather_cache[key] = {"feelsLikeMin" => return_val[0],
+          @@weather_cache[postal_code_eq][timestamp] = {"feelsLikeMin" => return_val[0],
                                   "feelsLikeAvg" => return_val[1],
                                   "feelsLikeMax" => return_val[2],
                                   "precip" => return_val[3],
@@ -120,11 +121,11 @@ class WeatherAPI
                                   "windSpdAvg" => return_val[9],
                                   "windSpdMax" => return_val[10]}
         else
-          #puts json_response['message']
+          puts json_response['message']
         end
       end
     rescue StandardError => err
-      #puts err
+      puts err
     end
     return return_val
   end
