@@ -294,8 +294,11 @@ def parseKML(filepath)
   
   begin
     doc = Nokogiri::XML(kml)
-    doc.search('coordinates').each do |coord|
-      result.push(coord.content.split(',').slice(0, 2))
+    doc.search('coordinates').each do |coordinates|
+      coordinate_array = coordinates.content.split(' ')
+      coordinate_array.each_with_index do |coord|
+        result.push(coord.split(',').slice(0, 2))
+      end
     end
   rescue Exception => msg
     puts msg
