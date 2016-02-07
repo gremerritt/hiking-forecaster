@@ -6,7 +6,6 @@ require 'date'
 
 class WeatherAPI
   @@weather_root = 'https://api.weathersource.com/v1/'
-  @@weather_key = 'b2f3ea7109d2f376bd0a'
   @@weather_resource = 'history_by_postal_code'
   @@weather_format = 'json'
   @@weather_fields = ['tempMax',
@@ -22,24 +21,91 @@ class WeatherAPI
                       'feelsLikeMin']
   @@weather_total_calls
   @@weather_last_call
-  @@weather_calls_per_minute = 10
-  @@weather_call_limit = 1000
   
-  @@google_key = 'AIzaSyCAUWj528-GBPah2yCIYfKR_7ThOvEm8MU'
   @@google_root = 'https://maps.googleapis.com/maps/api/geocode/json'
   @@google_total_calls
   @@google_last_call
-  @@google_calls_per_minute = 10
-  @@google_call_limit = 2500
+  @@success = false
   
   def initialize
-    @@weather_uri = "#{@@weather_root}#{@@weather_key}/#{@@weather_resource}.#{@@weather_format}"
     t = Time.new
     @@today = "#{t.year}-#{t.month}-#{t.day}"
     read_call_counts
+    return if !setup_credentials
     setup_coord_cache
     setup_weather_cache
-    #puts "weather_total_calls: #{@@weather_total_calls}\nweather_last_call: #{@@weather_last_call}\ngoogle_total_calls: #{@@google_total_calls}\ngoogle_last_call: #{@@google_last_call}"
+    @@weather_uri = "#{@@weather_root}#{@@weather_key}/#{@@weather_resource}.#{@@weather_format}"
+  end
+  
+  def success
+    @@success
+  end
+  
+  def setup_credentials
+    begin
+      File.open(".credentials.json", "r") do |f|
+        contents = f.read
+        if contents != ""
+          creds = JSON.parse(contents)
+          raise "No Google API Key" if creds["google"]["api_key"] == ""
+          raise "No Google Calls per Minute" if creds["google"]["calls_per_minute"] == ""
+          raise "No Google Calls per Day" if creds["google"]["calls_per_day"] == ""
+          raise "No Weather API Key" if creds["weather"]["api_key"] == ""
+          raise "No Weather Calls per Minute" if creds["weather"]["calls_per_minute"] == ""
+          raise "No Weather Calls per Day" if creds["weather"]["calls_per_day"] == ""
+          
+          @@google_key = creds["google"]["api_key"]
+          @@google_calls_per_minute = creds["google"]["calls_per_minute"].to_i
+          @@google_call_limit = creds["google"]["calls_per_day"].to_i
+          @@weather_key = creds["weather"]["api_key"]
+          @@weather_calls_per_minute = creds["weather"]["calls_per_minute"].to_i
+          @@weather_call_limit = creds["weather"]["calls_per_day"].to_i
+          @@success = true
+          return true
+        else
+          raise ".credentials.json file is empty"
+        end
+      end
+    rescue StandardError => err
+      if !File.file?(".credentials.json")
+        puts "No credentials found. Please update the .credentials file."
+        creds = {
+                 "google" => {"api_key" => "",
+                              "calls_per_minute" => "",
+                              "calls_per_day" => ""},
+                 "weather" => {
+                              "api_key" => "",
+                              "calls_per_minute" => "",
+                              "calls_per_day" => ""}
+                }
+        File.open(".credentials.json", "w") { |f| f.write(creds.to_json) }
+      else
+        puts err
+      end
+      return false
+    end
+  end
+  
+  def setup_coord_cache
+    File.open(".coordinate_cache.json", "a+") do |f|
+      contents = f.read
+      if contents != ""
+        @@coord_cache = JSON.parse(contents)
+      else
+        @@coord_cache = {}
+      end
+    end
+  end
+  
+  def setup_weather_cache
+    File.open(".weather_cache.json", "a+") do |f|
+      contents = f.read
+      if contents != ""
+        @@weather_cache = JSON.parse(contents)
+      else
+        @@weather_cache = {}
+      end
+    end
   end
   
   def weather_call(postal_code_eq, timestamp_eq)
@@ -49,7 +115,6 @@ class WeatherAPI
       return return_val if postal_code_eq == ""
       
       timestamp = getRelativeDate(timestamp_eq, 2)
-      #key = "#{postal_code_eq}|#{timestamp}"
       
       if !@@weather_cache[postal_code_eq][timestamp].nil?
         cache = @@weather_cache[postal_code_eq][timestamp]
@@ -110,22 +175,22 @@ class WeatherAPI
           end
           
           @@weather_cache[postal_code_eq][timestamp] = {"feelsLikeMin" => return_val[0],
-                                  "feelsLikeAvg" => return_val[1],
-                                  "feelsLikeMax" => return_val[2],
-                                  "precip" => return_val[3],
-                                  "snowfall" => return_val[4],
-                                  "tempMin" => return_val[5],
-                                  "tempAvg" => return_val[6],
-                                  "tempMax" => return_val[7],
-                                  "windSpdMin" => return_val[8],
-                                  "windSpdAvg" => return_val[9],
-                                  "windSpdMax" => return_val[10]}
+                                                        "feelsLikeAvg" => return_val[1],
+                                                        "feelsLikeMax" => return_val[2],
+                                                        "precip" => return_val[3],
+                                                        "snowfall" => return_val[4],
+                                                        "tempMin" => return_val[5],
+                                                        "tempAvg" => return_val[6],
+                                                        "tempMax" => return_val[7],
+                                                        "windSpdMin" => return_val[8],
+                                                        "windSpdAvg" => return_val[9],
+                                                        "windSpdMax" => return_val[10]}
         else
-          puts json_response['message']
+          #puts json_response['message']
         end
       end
     rescue StandardError => err
-      puts err
+      #puts err
     end
     return return_val
   end
@@ -203,28 +268,6 @@ class WeatherAPI
       #puts err
     end
     return return_val
-  end
-  
-  def setup_coord_cache
-    File.open(".coordinate_cache.json", "a+") do |f|
-      contents = f.read
-      if contents != ""
-        @@coord_cache = JSON.parse(contents)
-      else
-        @@coord_cache = {}
-      end
-    end
-  end
-  
-  def setup_weather_cache
-    File.open(".weather_cache.json", "a+") do |f|
-      contents = f.read
-      if contents != ""
-        @@weather_cache = JSON.parse(contents)
-      else
-        @@weather_cache = {}
-      end
-    end
   end
   
   def read_call_counts
@@ -335,6 +378,7 @@ end
 
 def main
   api = WeatherAPI.new
+  return if !api.success
   print "What trail is this for? "
   trail = STDIN.gets.chomp
   print "Enter the path to your KML file: "
