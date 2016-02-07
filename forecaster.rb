@@ -356,12 +356,19 @@ def getDate(prompt)
   while true
     begin
       print prompt
-      date = Date.parse(STDIN.gets.chomp)
-      return date
+      date = STDIN.gets.chomp
+      return Date.parse(date)
     rescue StandardError => msg
       puts " => Invalid Date Format"
     end
   end
+end
+
+def getDays
+  print "Enter the number of hiking days: "
+  num_days = STDIN.gets.chomp
+  return num_days if num_days == ""
+  return num_days.to_i
 end
 
 def getDirection
@@ -392,8 +399,11 @@ def main
   direction = getDirection
   data.reverse! if (direction == "NS" and data[0][1] < data[-1][1]) or (direction == "SN" and data[0][1] > data[-1][1])
   start_date = getDate("Enter a start date (YYYY-MM-DD): ")
-  end_date = getDate("Enter an end date (YYYY-MM-DD): ")
-  num_days = (end_date - start_date).to_i + 1
+  num_days = getDays
+  if num_days == ""
+    end_date = getDate("Enter an end date (YYYY-MM-DD): ", true)
+    num_days = (end_date - start_date).to_i + 1
+  end
   puts "Total number of days:   #{num_days}"
   
   begin
