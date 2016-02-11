@@ -25,6 +25,7 @@ class WeatherAPI
   @@google_root = 'https://maps.googleapis.com/maps/api/geocode/json'
   @@google_total_calls
   @@google_last_call
+  @@low_resolution = false
   @@success = false
   
   def initialize
@@ -39,6 +40,10 @@ class WeatherAPI
   
   def success
     @@success
+  end
+  
+  def set_low_resolution(value)
+    @@low_resolution = value
   end
   
   def setup_credentials
@@ -203,10 +208,16 @@ class WeatherAPI
     return date.join("-")
   end
   
-  def google_call(lat, lon, debug = false)	
+  def google_call(lat, lon)	
     begin
       return_val = ['', '', '']
-      key = "#{'%.3f' % lat.to_f},#{'%.3f' % lon.to_f}"
+      
+      if @@low_resolution
+        key = "#{'%.2f' % lat.to_f},#{'%.2f' % lon.to_f}"
+      else
+        key = "#{'%.3f' % lat.to_f},#{'%.3f' % lon.to_f}"
+      end
+        
       if !@@coord_cache[key].nil?
         return_val[0] = @@coord_cache[key]["city"]
         return_val[1] = @@coord_cache[key]["state"]
@@ -227,29 +238,21 @@ class WeatherAPI
         @@google_last_call = Time.now.to_i
         @@google_total_calls += 1
         if res.is_a?(Net::HTTPSuccess)
-          puts "#{JSON.pretty_generate(json_response)}\n\n" if debug
           if json_response['status'] == 'OK'
-            puts "OK\n\n" if debug
             address = json_response['results'][0]
-            puts "#{JSON.pretty_generate(address)}\n\n" if debug
             address['address_components'].each do |address_component|
-              puts "#{address_component}\n\n" if debug
-              
               # city
               if address_component['types'][0] == 'locality'
-                puts "#{address_component['long_name']}\n\n" if debug
                 return_val[0] = address_component['long_name']
               end
               
               #state
               if address_component['types'][0] == 'administrative_area_level_1'
-                puts "#{address_component['short_name']}\n\n" if debug
                 return_val[1] = address_component['short_name']
               end
               
               #zip
               if address_component['types'][0] == 'postal_code'
-                puts "#{address_component['long_name'].to_s}\n\n" if debug
                 return_val[2] = address_component['long_name'].to_s
               end
               
@@ -403,8 +406,21 @@ def main
   if num_days == ""
     end_date = getDate("Enter an end date (YYYY-MM-DD): ", true)
     num_days = (end_date - start_date).to_i + 1
+    puts "Total number of days:   #{num_days}"
   end
-  puts "Total number of days:   #{num_days}"
+  
+  if data.length > 500
+    print "This file has many data points. Use lower latitude/longitude resolution? (Y/N): "
+    while true
+      resp = STDIN.gets.chomp
+      if resp.downcase != 'n' and resp.downcase != 'y'
+        puts " => Invalid response"
+        next
+      end
+      api.set_low_resolution(true) if resp.downcase == 'y'
+      break
+    end
+  end
   
   begin
     if data.length > num_days
@@ -475,8 +491,12 @@ def main
               "windSpdAvg",
               "windSpdMax"]
     data.insert(0, header)
-    File.open("#{trail}_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
   ensure
+    begin
+      File.open("#{trail}_data.csv", "w") {|f| f.write(data.inject([]) { |csv, row|  csv << CSV.generate_line(row) }.join(""))}
+    rescue StandardError => err
+      puts "Couldn't write file."
+    end
     api.flush
   end
 end
