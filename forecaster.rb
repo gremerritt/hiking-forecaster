@@ -121,8 +121,8 @@ class WeatherAPI
       
       timestamp = getRelativeDate(timestamp_eq, 2)
       
-      if !@@weather_cache[postal_code_eq][timestamp].nil?
-        cache = @@weather_cache[postal_code_eq][timestamp]
+      if !@@weather_cache[postal_code_eq].nil? and !@@weather_cache[postal_code_eq][timestamp_eq].nil?
+        cache = @@weather_cache[postal_code_eq][timestamp_eq]
         return_val[0] = cache["feelsLikeMin"]
         return_val[1] = cache["feelsLikeAvg"]
         return_val[2] = cache["feelsLikeMax"]
@@ -179,23 +179,30 @@ class WeatherAPI
             end
           end
           
-          @@weather_cache[postal_code_eq][timestamp] = {"feelsLikeMin" => return_val[0],
-                                                        "feelsLikeAvg" => return_val[1],
-                                                        "feelsLikeMax" => return_val[2],
-                                                        "precip" => return_val[3],
-                                                        "snowfall" => return_val[4],
-                                                        "tempMin" => return_val[5],
-                                                        "tempAvg" => return_val[6],
-                                                        "tempMax" => return_val[7],
-                                                        "windSpdMin" => return_val[8],
-                                                        "windSpdAvg" => return_val[9],
-                                                        "windSpdMax" => return_val[10]}
+          new_cache_entry = {"feelsLikeMin" => return_val[0],
+                             "feelsLikeAvg" => return_val[1],
+                             "feelsLikeMax" => return_val[2],
+                             "precip" => return_val[3],
+                             "snowfall" => return_val[4],
+                             "tempMin" => return_val[5],
+                             "tempAvg" => return_val[6],
+                             "tempMax" => return_val[7],
+                             "windSpdMin" => return_val[8],
+                             "windSpdAvg" => return_val[9],
+                             "windSpdMax" => return_val[10]}
+        
+          if @@weather_cache[postal_code_eq].nil?
+            @@weather_cache[postal_code_eq] = {timestamp_eq => new_cache_entry}
+          else
+            @@weather_cache[postal_code_eq][timestamp_eq] = new_cache_entry
+          end
         else
-          #puts json_response['message']
+          puts json_response['message']
         end
       end
     rescue StandardError => err
-      #puts err
+      puts "WEATHER ERROR:\n  Postal Code: #{postal_code_eq}\n  Timestamp: #{timestamp_eq}"
+      puts err
     end
     return return_val
   end
